@@ -2,17 +2,39 @@
 interface Emiter { }
 
 class EventListener {
+  public eventName: string
   public emitter: EventHub
   public handler: () => void
-  constructor(handler: () => void, emitter: EventHub) {
+  public distoried: boolean = false
+  constructor(eventName: string, handler: () => void, emitter: EventHub) {
+    this.eventName = eventName
     this.handler = handler
     this.emitter = emitter
+  }
+
+  public unregister() {
+    this.emitter.off(this.eventName, this)
+    this.distory()
+  }
+
+  public distory(): boolean {
+    if (this.distoried) {
+      return false
+    }
+    this.handler = null
+    this.emitter = null
+    this.distoried = true
+    return true
   }
 }
 
 export class EventHub {
   private cached: { [name: string]: EventListener[] } = {}
 
+  /**
+   * @param: 监听的事件名
+   * @param: 事件的处理函数, 在事件触发时会被调用
+  */
   public on(eventName: string, handler: () => void) {
     if (!handler) {
       throw new Error('invaild handler')
@@ -20,10 +42,13 @@ export class EventHub {
     if (!this.cached[eventName]) {
       this.cached[eventName] = []
     }
-    const listener = new EventListener(handler, this)
+    const listener = new EventListener(eventName, handler, this)
     this.cached[eventName].push(listener)
   }
 
+  /**
+   * @param eventName: 触发事件的名称
+  */
   public emit(eventName: string) {
     const listeners = this.cached[eventName]
     listeners.forEach((listener) => {
@@ -31,8 +56,49 @@ export class EventHub {
     })
   }
 
-  public off(eventName: string) {
-    this.cached[eventName] = null
+  /**
+   * 一次性的事件监听,不会被进入事件缓存中,使用后会自动销毁
+   * @param: 监听的事件名
+   * @param: 事件的处理函数, 在事件触发时会被调用
+  */
+  public once(eventName: string, handler: () => void) {
+    if (!handler) {
+      throw new Error('invaild handler')
+    }
+    //TODO:
+  }
+
+  /**
+   * @param eventName: 注销事件的名称
+   * @param target: 需要注销的事件
+   * 不传入 target 默认注销整个事件
+  */
+  public off(eventName: string, target?: EventListener): boolean {
+    if (!this.cached[eventName]) {
+      return false
+    }
+    if (target) {
+      for (let listeners = this.cached[eventName], i = 0; i < listeners.length; i++) {
+        const listener = listeners[i]
+        if (listener !== target) {
+          continue
+        }
+        this.cached[eventName] = this.cached[eventName].filter((l) => {
+          return l !== listener
+        })
+        listener.distory()
+      }
+      if (this.cached[eventName].length === 0) {
+        delete this.cached[eventName]
+        return true
+      }
+      return false
+    } else {
+      //TODO:待优化
+      this.cached[eventName] = []
+      delete this.cached[eventName]
+      return true
+    }
   }
 }
 
