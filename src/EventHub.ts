@@ -1,12 +1,15 @@
+type Handler<E> = (data: E) => void
 
-interface Emiter { }
+interface Emiter {
+  [key: string]: any
+}
 
 class EventListener {
   public eventName: string
-  public emitter: EventHub
-  public handler: () => void
+  public emitter: EventHub<any>
+  public handler: Handler<any>
   public distoried: boolean = false
-  constructor(eventName: string, handler: () => void, emitter: EventHub) {
+  constructor(eventName: string, handler: Handler<any>, emitter: EventHub<any>) {
     this.eventName = eventName
     this.handler = handler
     this.emitter = emitter
@@ -28,31 +31,31 @@ class EventListener {
   }
 }
 
-export class EventHub {
-  private cached: { [name: string]: EventListener[] } = {}
+export class EventHub<E extends Emiter> {
+  private cached: { [name in keyof E]: EventListener[] } = {} as any
 
   /**
    * @param: 监听的事件名
    * @param: 事件的处理函数, 在事件触发时会被调用
   */
-  public on(eventName: string, handler: () => void) {
+  public on<N extends keyof E>(eventName: N, handler: Handler<E[N]>) {
     if (!handler) {
       throw new Error('invaild handler')
     }
     if (!this.cached[eventName]) {
       this.cached[eventName] = []
     }
-    const listener = new EventListener(eventName, handler, this)
+    const listener = new EventListener(eventName as string, handler, this)
     this.cached[eventName].push(listener)
   }
 
   /**
    * @param eventName: 触发事件的名称
   */
-  public emit(eventName: string) {
+  public emit<N extends keyof E>(eventName: N, data: E[N] = null) {
     const listeners = this.cached[eventName]
     listeners.forEach((listener) => {
-      listener.handler.call(this)
+      listener.handler.call(this, data)
     })
   }
 
@@ -73,7 +76,7 @@ export class EventHub {
    * @param target: 需要注销的事件
    * 不传入 target 默认注销整个事件
   */
-  public off(eventName: string, target?: EventListener): boolean {
+  public off<N extends keyof E>(eventName: N, target?: EventListener): boolean {
     if (!this.cached[eventName]) {
       return false
     }
